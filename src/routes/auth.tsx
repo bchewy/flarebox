@@ -4,12 +4,26 @@ import { sendOTPEmail } from '../lib/email'
 import { createSession, setSessionCookie, clearSession } from '../middleware/auth'
 import type { Env } from '../types'
 
+// Constant-time string comparison to prevent timing attacks
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    // Compare against itself to maintain constant time even on length mismatch
+    b = a
+  }
+  let result = a.length === b.length ? 0 : 1
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  }
+  return result === 0
+}
+
 const auth = new Hono<{ Bindings: Env }>()
 
 auth.post('/login', async (c) => {
   try {
-    // Rate limit: 5 requests per 15 minutes
-    const allowed = await checkRateLimit(c.env.SESSIONS, 'login', 5, 900)
+    // Rate limit: 5 requests per 15 minutes per IP
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown'
+    const allowed = await checkRateLimit(c.env.SESSIONS, `login:${ip}`, 5, 900)
     if (!allowed) {
       return c.json({ error: 'Too many requests. Try again later.' }, 429)
     }
@@ -45,7 +59,8 @@ auth.post('/verify-otp', async (c) => {
   }
   
   if (!c.env.JWT_SECRET) {
-    return c.json({ error: 'Server misconfigured: JWT_SECRET not set' }, 500)
+    console.error('JWT_SECRET not configured')
+    return c.json({ error: 'Authentication unavailable' }, 500)
   }
   
   const token = await createSession(result.email!, c.env.JWT_SECRET)
@@ -61,18 +76,20 @@ auth.post('/password', async (c) => {
     return c.json({ error: 'Password required' }, 400)
   }
 
-  // Rate limit: 5 attempts per 15 minutes
-  const allowed = await checkRateLimit(c.env.SESSIONS, 'password', 5, 900)
+  // Rate limit: 5 attempts per 15 minutes per IP
+  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown'
+  const allowed = await checkRateLimit(c.env.SESSIONS, `password:${ip}`, 5, 900)
   if (!allowed) {
     return c.json({ error: 'Too many attempts. Try again later.' }, 429)
   }
   
-  if (password !== c.env.DROPBOX_PASSWORD) {
+  if (!safeCompare(password, c.env.DROPBOX_PASSWORD)) {
     return c.json({ error: 'Invalid password' }, 401)
   }
   
   if (!c.env.JWT_SECRET) {
-    return c.json({ error: 'Server misconfigured: JWT_SECRET not set' }, 500)
+    console.error('JWT_SECRET not configured')
+    return c.json({ error: 'Authentication unavailable' }, 500)
   }
   
   const token = await createSession(c.env.DROPBOX_EMAIL, c.env.JWT_SECRET)

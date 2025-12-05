@@ -1,5 +1,7 @@
 export function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  const array = new Uint32Array(1)
+  crypto.getRandomValues(array)
+  return String(100000 + (array[0] % 900000))
 }
 
 export function generateChallenge(): string {

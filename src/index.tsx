@@ -14,6 +14,16 @@ function sanitizeFilename(name: string): string {
 
 const app = new Hono<{ Bindings: Env }>()
 
+// Security headers middleware
+app.use('*', async (c, next) => {
+  await next()
+  c.res.headers.set('X-Content-Type-Options', 'nosniff')
+  c.res.headers.set('X-Frame-Options', 'DENY')
+  c.res.headers.set('X-XSS-Protection', '1; mode=block')
+  c.res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  c.res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+})
+
 app.use(renderer)
 
 // Logging middleware for all API routes
@@ -39,12 +49,9 @@ app.get('/api/share/:key', async (c) => {
   const key = c.req.param('key')
   const object = await c.env.FILES.get(key)
   
-  if (!object) {
+  // Return same error for "not found" and "not shared" to prevent enumeration
+  if (!object || object.customMetadata?.shared !== 'true') {
     return c.json({ error: 'File not found' }, 404)
-  }
-  
-  if (object.customMetadata?.shared !== 'true') {
-    return c.json({ error: 'This file is not shared' }, 403)
   }
   
   const filename = sanitizeFilename(object.customMetadata?.originalName || key)

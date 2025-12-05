@@ -127,8 +127,14 @@ files.post('/upload-url', async (c) => {
     const { filename, contentType, folder } = await c.req.json()
     console.log('[upload-url] Request:', { filename, contentType, folder })
     
-    if (!filename) {
-      return c.json({ error: 'Filename required' }, 400)
+    // Validate filename: only alphanumeric, dashes, underscores, dots, spaces
+    const validFilename = /^[\w\-. ]+$/
+    if (!filename || !validFilename.test(filename)) {
+      return c.json({ error: 'Invalid filename. Use only letters, numbers, dashes, underscores, dots, and spaces.' }, 400)
+    }
+    
+    if (filename.length > 200) {
+      return c.json({ error: 'Filename too long. Max 200 characters.' }, 400)
     }
     
     const key = `${Date.now()}-${filename}`

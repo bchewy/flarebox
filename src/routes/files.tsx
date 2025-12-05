@@ -1,20 +1,10 @@
 import { Hono } from 'hono'
 import { AwsClient } from 'aws4fetch'
 import { requireAuth } from '../middleware/auth'
+import { sanitizeFilename, getMetadata } from '../lib/utils'
 import type { Env } from '../types'
 
 const MAX_DIRECT_SIZE = 50 * 1024 * 1024 // 50MB - use presigned URLs above this
-
-function sanitizeFilename(name: string): string {
-  return name.replace(/["\r\n]/g, '_')
-}
-
-// Helper to get metadata - handles both camelCase (direct upload) and lowercase (presigned URL)
-function getMetadata(meta: Record<string, string> | undefined, key: string): string | undefined {
-  if (!meta) return undefined
-  // Try camelCase first (direct upload), then lowercase (presigned URL)
-  return meta[key] ?? meta[key.toLowerCase()]
-}
 
 interface UploadMetadata {
   originalName: string

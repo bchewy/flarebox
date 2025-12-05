@@ -6,11 +6,8 @@ import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { SharePage } from './pages/Share'
 import { requireAuth } from './middleware/auth'
+import { sanitizeFilename } from './lib/utils'
 import type { Env } from './types'
-
-function sanitizeFilename(name: string): string {
-  return name.replace(/["\r\n]/g, '_')
-}
 
 const app = new Hono<{ Bindings: Env }>()
 

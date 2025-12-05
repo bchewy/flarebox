@@ -2,20 +2,8 @@ import { Hono } from 'hono'
 import { generateOTP, generateChallenge, storeOTP, validateOTP, checkRateLimit } from '../lib/otp'
 import { sendOTPEmail } from '../lib/email'
 import { createSession, setSessionCookie, clearSession } from '../middleware/auth'
+import { safeCompare } from '../lib/utils'
 import type { Env } from '../types'
-
-// Constant-time string comparison to prevent timing attacks
-function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    // Compare against itself to maintain constant time even on length mismatch
-    b = a
-  }
-  let result = a.length === b.length ? 0 : 1
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  }
-  return result === 0
-}
 
 const auth = new Hono<{ Bindings: Env }>()
 

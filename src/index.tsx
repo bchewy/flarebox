@@ -1,0 +1,88 @@
+import { Hono } from 'hono'
+import { renderer } from './renderer'
+import auth from './routes/auth'
+import files from './routes/files'
+import { Login } from './pages/Login'
+import { Dashboard } from './pages/Dashboard'
+import { SharePage } from './pages/Share'
+import { requireAuth } from './middleware/auth'
+import type { Env } from './types'
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/["\r\n]/g, '_')
+}
+
+const app = new Hono<{ Bindings: Env }>()
+
+app.use(renderer)
+
+// Logging middleware for all API routes
+app.use('/api/*', async (c, next) => {
+  const start = Date.now()
+  const method = c.req.method
+  const path = c.req.path
+  
+  console.log(`→ ${method} ${path}`)
+  
+  await next()
+  
+  const duration = Date.now() - start
+  const status = c.res.status
+  console.log(`← ${method} ${path} ${status} (${duration}ms)`)
+})
+
+app.route('/api/auth', auth)
+app.route('/api/files', files)
+
+// Public share endpoint (no auth)
+app.get('/api/share/:key', async (c) => {
+  const key = c.req.param('key')
+  const object = await c.env.FILES.get(key)
+  
+  if (!object) {
+    return c.json({ error: 'File not found' }, 404)
+  }
+  
+  if (object.customMetadata?.shared !== 'true') {
+    return c.json({ error: 'This file is not shared' }, 403)
+  }
+  
+  const filename = sanitizeFilename(object.customMetadata?.originalName || key)
+  const headers = new Headers()
+  headers.set('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream')
+  headers.set('Content-Disposition', `inline; filename="${filename}"`)
+  headers.set('Cache-Control', 'public, max-age=3600')
+  
+  return new Response(object.body, { headers })
+})
+
+// Public share page
+app.get('/s/:key', async (c) => {
+  const key = c.req.param('key')
+  const object = await c.env.FILES.head(key)
+  
+  if (!object || object.customMetadata?.shared !== 'true') {
+    return c.render(
+      <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'system-ui' }}>
+        <h1>File not found</h1>
+        <p>This file doesn't exist or is no longer shared.</p>
+      </div>
+    )
+  }
+  
+  return c.render(<SharePage fileKey={key} fileName={object.customMetadata?.originalName || key} contentType={object.httpMetadata?.contentType || 'application/octet-stream'} />)
+})
+
+app.get('/login', (c) => {
+  return c.render(<Login />)
+})
+
+app.get('/dashboard', requireAuth, (c) => {
+  return c.render(<Dashboard />)
+})
+
+app.get('/', (c) => {
+  return c.redirect('/login')
+})
+
+export default app

@@ -1,0 +1,25 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "flarebox",
+	"compatibility_date": "2025-08-03",
+	"main": "./src/index.tsx",
+	"routes": [
+		{
+			"pattern": "your-domain.com/*",
+			"zone_name": "your-domain.com"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "FILES",
+			"bucket_name": "your-bucket-name"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "SESSIONS",
+			"id": "your-kv-namespace-id",
+			"preview_id": "your-preview-kv-namespace-id"
+		}
+	]
+}

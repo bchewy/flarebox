@@ -1,0 +1,8 @@
+DROPBOX_PASSWORD=your-password
+DROPBOX_EMAIL=your-email
+RESEND_API_KEY=re_xxxx
+JWT_SECRET=your-secret
+R2_ACCESS_KEY_ID=xxxx
+R2_SECRET_ACCESS_KEY=xxxx
+R2_ENDPOINT=https://xxxx.r2.cloudflarestorage.com
+R2_BUCKET_NAME=your-bucket

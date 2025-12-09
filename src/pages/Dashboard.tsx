@@ -207,10 +207,51 @@ export function Dashboard() {
           const toast = document.getElementById('toast');
           const storageStats = document.getElementById('storage-stats');
           
+          var showPreciseCost = true;
+          var lastStats = null;
+          
+          function formatCost(cost, precise) {
+            if (cost === 0) return '$0/mo';
+            if (precise) {
+              // Precise: show significant digits
+              if (cost >= 0.01) return '$' + cost.toFixed(2) + '/mo';
+              return '$' + cost.toPrecision(2) + '/mo';
+            } else {
+              // Readable: round to 2 decimals or whole number
+              if (cost >= 1) return '$' + Math.round(cost) + '/mo';
+              return '$' + cost.toFixed(2) + '/mo';
+            }
+          }
+          
+          function renderStats() {
+            if (!lastStats) return;
+            var sizeStr = formatBytes(lastStats.totalSize);
+            var costStr = formatCost(lastStats.storageCostMonthly, showPreciseCost);
+            storageStats.innerHTML = lastStats.totalFiles + ' files · ' + sizeStr + ' · <span class="cost-toggle" style="cursor:pointer;text-decoration:underline dotted;">' + costStr + '</span>';
+            storageStats.querySelector('.cost-toggle').onclick = function(e) {
+              e.stopPropagation();
+              showPreciseCost = !showPreciseCost;
+              renderStats();
+              renderDrawerStats();
+            };
+          }
+          
+          function renderDrawerStats() {
+            if (!lastStats) return;
+            var costStr = formatCost(lastStats.storageCostMonthly, showPreciseCost);
+            drawerStats.innerHTML = lastStats.totalFiles + ' files · ' + formatBytes(lastStats.totalSize) + ' · <span class="cost-toggle" style="cursor:pointer;text-decoration:underline dotted;">' + costStr + '</span>';
+            drawerStats.querySelector('.cost-toggle').onclick = function(e) {
+              e.stopPropagation();
+              showPreciseCost = !showPreciseCost;
+              renderStats();
+              renderDrawerStats();
+            };
+          }
+          
           function loadStats() {
             fetch('/api/files/stats').then(function(res) { return res.json(); }).then(function(data) {
-              var sizeStr = formatBytes(data.totalSize);
-              storageStats.textContent = data.totalFiles + ' files · ' + sizeStr;
+              lastStats = data;
+              renderStats();
             }).catch(function() {
               storageStats.textContent = '';
             });
@@ -1504,9 +1545,7 @@ export function Dashboard() {
             }, 10);
             updateDrawerFolders();
             // Update drawer stats
-            fetch('/api/files/stats').then(function(r) { return r.json(); }).then(function(data) {
-              drawerStats.textContent = data.totalFiles + ' files · ' + formatBytes(data.totalSize);
-            });
+            renderDrawerStats();
           }
           
           function closeDrawer() {

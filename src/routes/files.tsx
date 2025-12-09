@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
-import { AwsClient } from 'aws4fetch'
+import { AwsClient } from 'aws4fetch' 
 import { requireAuth } from '../middleware/auth'
 import { sanitizeFilename, getMetadata } from '../lib/utils'
 import type { Env } from '../types'
 
 const MAX_DIRECT_SIZE = 50 * 1024 * 1024 // 50MB - use presigned URLs above this
+const R2_STORAGE_COST_PER_GB = 0.015 // $/GB/month
 
 interface UploadMetadata {
   originalName: string
@@ -12,6 +13,7 @@ interface UploadMetadata {
   uploadedAt: string
 }
 
+// presign url for largwr files 
 async function generatePresignedUrl(
   env: Env,
   key: string,
@@ -54,6 +56,7 @@ const files = new Hono<{ Bindings: Env }>()
 
 files.use('/*', requireAuth)
 
+//counts size, total items, etc.
 files.get('/stats', async (c) => {
   const objects = await c.env.FILES.list()
   
@@ -67,10 +70,13 @@ files.get('/stats', async (c) => {
     folderCounts[folder] = (folderCounts[folder] || 0) + 1
   }
   
+  const storageCostMonthly = (totalSize / (1024 ** 3)) * R2_STORAGE_COST_PER_GB
+  
   return c.json({
     totalFiles: objects.objects.length,
     totalSize,
-    folderCounts
+    folderCounts,
+    storageCostMonthly
   })
 })
 
@@ -198,6 +204,7 @@ files.get('/list', async (c) => {
   return c.json({ files: allFiles, folders })
 })
 
+// preview for on website - loads into iframe 
 files.get('/preview/:key', async (c) => {
   const key = c.req.param('key')
   const object = await c.env.FILES.get(key)
